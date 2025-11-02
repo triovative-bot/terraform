@@ -9,13 +9,6 @@ on:
       - '.github/workflows/terraform-prod.yml'
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Environment to deploy'
-        required: true
-        default: 'prod'
-        type: choice
-        options:
-        - prod
       auto_approve:
         description: 'Auto-approve the deployment'
         required: false
@@ -25,15 +18,12 @@ on:
 env:
   TF_VERSION: '1.7.4'
   AWS_REGION: 'us-east-1'
-  ENVIRONMENT: 'prod'
 
 jobs:
   terraform-plan:
     name: 'Terraform Plan - Prod'
     runs-on: ubuntu-latest
     environment: prod
-    permissions:
-      contents: read
 
     steps:
       - name: Checkout code
@@ -47,24 +37,24 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform Init
         run: |
-          cd terraform/environments/${{ env.ENVIRONMENT }}
+          cd terraform/environments/prod
           terraform init
 
       - name: Terraform Validate
         run: |
-          cd terraform/environments/${{ env.ENVIRONMENT }}
+          cd terraform/environments/prod
           terraform validate
 
       - name: Terraform Plan
         id: plan
         run: |
-          cd terraform/environments/${{ env.ENVIRONMENT }}
+          cd terraform/environments/prod
           terraform plan \
             -var="aws_region=${{ env.AWS_REGION }}" \
             -input=false \
@@ -82,9 +72,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
     needs: terraform-plan
-    permissions:
-      contents: read
-      id-token: write
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.auto_approve == true)
 
     steps:
       - name: Checkout code
@@ -104,49 +92,16 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform Init
         run: |
-          cd terraform/environments/${{ env.ENVIRONMENT }}
+          cd terraform/environments/prod
           terraform init
 
       - name: Terraform Apply
-        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.auto_approve == true)
         run: |
-          cd terraform/environments/${{ env.ENVIRONMENT }}
+          cd terraform/environments/prod
           terraform apply -auto-approve plan.tfplan
-
-      - name: Manual Approval for Workflow Dispatch
-        if: github.event_name == 'workflow_dispatch' && inputs.auto_approve == false
-        run: |
-          echo "Manual approval required for production deployment."
-          echo "Run terraform apply manually or set auto_approve to true in workflow dispatch."
-          exit 1
-
-  notify:
-    name: 'Notify Production Deployment'
-    runs-on: ubuntu-latest
-    needs: terraform-apply
-    if: always()
-
-    steps:
-      - name: Notify Slack on Success
-        if: needs.terraform-apply.result == 'success'
-        uses: 8398a7/action-slack@v3
-        with:
-          status: success
-          text: 'Production deployment completed successfully! :rocket:'
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-      - name: Notify Slack on Failure
-        if: needs.terraform-apply.result == 'failure'
-        uses: 8398a7/action-slack@v3
-        with:
-          status: failure
-          text: 'Production deployment failed! :x:'
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
