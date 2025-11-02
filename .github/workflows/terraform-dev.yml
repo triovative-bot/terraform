@@ -2,12 +2,19 @@ name: 'Terraform Deploy - Dev'
 
 on:
   push:
-    branches: ['main']
+    branches: ['develop']
     paths:
       - 'terraform/**'
       - '.github/workflows/**'
   workflow_dispatch:
     inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
       auto_approve:
         description: 'Auto-approve the deployment'
         required: false
@@ -24,6 +31,9 @@ jobs:
     name: 'Terraform Deploy - Dev'
     runs-on: ubuntu-latest
     environment: dev
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -34,8 +44,8 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.DEV_AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.DEV_AWS_SECRET_ACCESS_KEY }}
@@ -92,13 +102,20 @@ jobs:
     if: always()
 
     steps:
-      - name: Notify on Failure
+      - name: Notify Slack on Failure
         if: needs.terraform.result == 'failure'
-        run: |
-          echo "🚨 Terraform deployment to DEV environment failed!"
-          # Add your notification logic here (Slack, Teams, etc.)
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: '🚨 Terraform deployment to DEV environment failed!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Notify on Success
+      - name: Notify Slack on Success
         if: needs.terraform.result == 'success'
-        run: |
-          echo "✅ Terraform deployment to DEV environment completed successfully!"
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: '✅ Terraform deployment to DEV environment completed successfully!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
