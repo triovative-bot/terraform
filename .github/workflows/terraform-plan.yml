@@ -5,11 +5,9 @@ on:
     branches: ['main']
     paths:
       - 'terraform/**'
-      - '.github/workflows/terraform-plan.yml'
 
 env:
   TF_VERSION: '1.7.4'
-  AWS_REGION: 'us-east-1'
 
 jobs:
   terraform-plan:
@@ -37,7 +35,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: 'us-east-1'
 
       - name: Terraform Format
         id: fmt
@@ -62,14 +60,12 @@ jobs:
         run: |
           cd terraform/environments/${{ matrix.environment }}
           terraform plan \
-            -var="aws_region=${{ env.AWS_REGION }}" \
+            -var="aws_region=us-east-1" \
             -input=false \
             -out=plan.tfplan
-        continue-on-error: true
 
       - name: Update Pull Request
         uses: actions/github-script@v7
-        if: github.event_name == 'pull_request'
         env:
           PLAN: "terraform\n${{ steps.plan.outputs.stdout }}"
         with:
@@ -79,7 +75,7 @@ jobs:
             #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
             #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
 
-            <details><summary>Show Plan</summary>
+            <details><summary>Show Plan for ${{ matrix.environment }}</summary>
 
             \`\`\`\n
             ${process.env.PLAN}
