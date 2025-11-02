@@ -1,20 +1,11 @@
 name: 'Terraform Plan'
 
 on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy'
-        required: true
-        default: 'dev'
-        type: choice
-        options:
-        - dev
-      auto_approve:
-        description: 'Auto-approve the deployment'
-        required: false
-        default: false
-        type: boolean
+  pull_request:
+    branches: ['main', 'develop']
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/**'
 
 env:
   TF_VERSION: '1.7.4'
@@ -41,8 +32,8 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Configure AWS credentials
-        uses: aws-actions/aws-credentials@v4
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
